@@ -59,7 +59,7 @@ class SerprogBus(enum.IntEnum):
     """
     PARALLEL = (1 << 0)
     LPC = (1 << 1)
-    FHW = (1 << 2)
+    FWH = (1 << 2)
     SPI = (1 << 3)
 
 
