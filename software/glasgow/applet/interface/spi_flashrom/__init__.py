@@ -71,6 +71,8 @@ class SerprogCommandHandler:
         (1 << SerprogCommand.CMD_Q_PGMNAME) |
         (1 << SerprogCommand.CMD_Q_SERBUF)  |
         (1 << SerprogCommand.CMD_Q_BUSTYPE) |
+        (1 << SerprogCommand.CMD_O_DELAY)   |
+        (1 << SerprogCommand.CMD_O_EXEC)    |
         (1 << SerprogCommand.CMD_SYNCNOP)   |
         (1 << SerprogCommand.CMD_O_SPIOP)   |
         (1 << SerprogCommand.CMD_S_BUSTYPE) |
@@ -84,6 +86,7 @@ class SerprogCommandHandler:
         self.interface = interface
         self.endpoint  = endpoint
         self.logger    = logger
+        self.delay_acc = 0
 
     async def get_u8(self):
         data, = await self.endpoint.recv(1)
@@ -91,6 +94,10 @@ class SerprogCommandHandler:
 
     async def get_u24(self):
         data = await self.endpoint.recv(3)
+        return int.from_bytes(data, byteorder='little')
+
+    async def get_u32(self):
+        data = await self.endpoint.recv(4)
         return int.from_bytes(data, byteorder='little')
 
     async def put_u8(self, value):
@@ -107,6 +114,7 @@ class SerprogCommandHandler:
 
     async def handle_cmd(self):
         cmd = await self.get_u8()
+        #self.logger.warning(f"cmd {cmd:#02x}")
 
         if cmd == SerprogCommand.CMD_NOP:
             await self.ack()
@@ -135,9 +143,20 @@ class SerprogCommandHandler:
                 await self.ack()
             else:
                 await self.nak()
+        elif cmd == SerprogCommand.CMD_O_DELAY:
+            delay = await self.get_u32()
+            self.delay_acc += delay
+            await self.ack()
+        elif cmd == SerprogCommand.CMD_O_EXEC:
+            if self.delay_acc:
+                await self.interface.lower.delay_us(self.delay_acc)
+                self.delay_acc = 0
+            await self.ack()
         elif cmd == SerprogCommand.CMD_S_PIN_STATE:
             out_en = await self.get_u8()
-            self.interface.lower.output_enable(out_en)
+            await self.interface.lower.output_enable(out_en)
+            if out_en:
+                await self.interface.lower.delay_ms(10)
             await self.ack()
         elif cmd == SerprogCommand.CMD_O_SPIOP:
             slen = await self.get_u24()
