@@ -35,7 +35,7 @@ class SPIControllerBus(Elaboratable):
         ]
         if hasattr(self.pads, "cs_t"):
             m.d.comb += [
-                self.pads.cs_t.oe.eq(1),
+                self.pads.cs_t.oe.eq(self.oe),
                 self.pads.cs_t.o.eq(~self.cs),
             ]
         if hasattr(self.pads, "copi_t"):
@@ -70,6 +70,7 @@ CMD_SELECT   = 0b00000000
 CMD_SHIFT    = 0b00010000
 CMD_DELAY    = 0b00100000
 CMD_SYNC     = 0b00110000
+CMD_OUT_EN   = 0b01000000
 # CMD_SHIFT
 BIT_DATA_OUT =     0b0001
 BIT_DATA_IN  =     0b0010
@@ -128,6 +129,8 @@ class SPIControllerSubtarget(Elaboratable):
                     m.d.sync += cmd.eq(self.out_fifo.r_data)
                     with m.If((self.out_fifo.r_data & CMD_MASK) == CMD_SELECT):
                         m.d.sync += self.bus.cs.eq(self.out_fifo.r_data[0])
+                    with m.If((self.out_fifo.r_data & CMD_MASK) == CMD_OUT_EN):
+                        m.d.sync += self.bus.oe.eq(self.out_fifo.r_data[0])
                     with m.Elif((self.out_fifo.r_data & CMD_MASK) == CMD_SYNC):
                         m.next = "SYNC"
                     with m.Else():
@@ -241,6 +244,11 @@ class SPIControllerInterface:
                 CMD_SELECT|0))
             await self.lower.flush()
 
+    async def output_enable(self, enable):
+        await self.lower.write(struct.pack("<B",
+            CMD_OUT_EN|bool(enable)))
+        await self.lower.flush()
+
     async def exchange(self, octets):
         self._log("xchg-o=<%s>", dump_hex(octets))
         for chunk in self._chunked(octets):
@@ -349,7 +357,9 @@ class SPIControllerApplet(GlasgowApplet):
         return iface.add_subtarget(controller)
 
     async def run(self, device, args):
-        iface = await device.demultiplexer.claim_interface(self, self.mux_interface, args)
+        # Pull CS high to allow output-disable to be safe even without external pulls.
+        iface = await device.demultiplexer.claim_interface(self, self.mux_interface, args,
+            pull_high={args.pin_cs})
         spi_iface = SPIControllerInterface(iface, self.logger)
         return spi_iface
 
