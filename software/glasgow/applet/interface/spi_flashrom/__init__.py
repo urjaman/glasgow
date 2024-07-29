@@ -73,7 +73,8 @@ class SerprogCommandHandler:
         (1 << SerprogCommand.CMD_Q_BUSTYPE) |
         (1 << SerprogCommand.CMD_SYNCNOP)   |
         (1 << SerprogCommand.CMD_O_SPIOP)   |
-        (1 << SerprogCommand.CMD_S_BUSTYPE)
+        (1 << SerprogCommand.CMD_S_BUSTYPE) |
+        (1 << SerprogCommand.CMD_S_PIN_STATE)
     )
 
     PROGNAME = b'Glasgow serprog\0'
@@ -134,6 +135,10 @@ class SerprogCommandHandler:
                 await self.ack()
             else:
                 await self.nak()
+        elif cmd == SerprogCommand.CMD_S_PIN_STATE:
+            out_en = await self.get_u8()
+            self.interface.lower.output_enable(out_en)
+            await self.ack()
         elif cmd == SerprogCommand.CMD_O_SPIOP:
             slen = await self.get_u24()
             rlen = await self.get_u24()
