@@ -17,6 +17,7 @@ class SPIControllerBus(Elaboratable):
         self.sck_edge = sck_edge
 
         self.oe   = Signal(init=1)
+        self.cs_oe   = Signal(init=1)
 
         self.sck  = Signal(init=sck_idle)
         self.cs   = Signal()
@@ -35,7 +36,7 @@ class SPIControllerBus(Elaboratable):
         ]
         if hasattr(self.pads, "cs_t"):
             m.d.comb += [
-                self.pads.cs_t.oe.eq(self.oe),
+                self.pads.cs_t.oe.eq(self.cs_oe),
                 self.pads.cs_t.o.eq(~self.cs),
             ]
         if hasattr(self.pads, "copi_t"):
@@ -129,8 +130,8 @@ class SPIControllerSubtarget(Elaboratable):
                     m.d.sync += cmd.eq(self.out_fifo.r_data)
                     with m.If((self.out_fifo.r_data & CMD_MASK) == CMD_SELECT):
                         m.d.sync += self.bus.cs.eq(self.out_fifo.r_data[0])
-                    with m.If((self.out_fifo.r_data & CMD_MASK) == CMD_OUT_EN):
-                        m.d.sync += self.bus.oe.eq(self.out_fifo.r_data[0])
+                    with m.Elif((self.out_fifo.r_data & CMD_MASK) == CMD_OUT_EN):
+                        m.d.sync += self.bus.cs_oe.eq(self.out_fifo.r_data[0])
                     with m.Elif((self.out_fifo.r_data & CMD_MASK) == CMD_SYNC):
                         m.next = "SYNC"
                     with m.Else():
