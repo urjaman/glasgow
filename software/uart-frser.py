@@ -21,10 +21,11 @@ def pinargs(x):
     return r
 
 async def _main():
+    volts = 2.7
     device = GlasgowHardwareDevice()
     await device.reset_alert("AB")
     await device.poll_alert()
-    await device.set_voltage("AB", 3.3)
+    await device.set_voltage("AB", volts)
     target = GlasgowHardwareTarget(revision=device.revision,
                                     multiplexer_cls=DirectMultiplexer,
                                     with_analyzer=False)
@@ -39,7 +40,7 @@ async def _main():
     SPIFlashromApplet.add_run_arguments(spifr_parser, access_args)
     UARTApplet.add_interact_arguments(uart_parser)
     SPIFlashromApplet.add_interact_arguments(spifr_parser)
-    volts = ["-V", "2.7"]
+    voltsarg = ["-V", str(volts)]
 
     uart_pins = {
         "rx": 4,
@@ -54,8 +55,8 @@ async def _main():
         "hold": 7
     }
 
-    uart_args = uart_parser.parse_args(volts + pinargs(uart_pins) + [ "-b", "115200", "tty"])
-    spifr_args = spifr_parser.parse_args(volts + pinargs(spi_pins) + [ "--freq", "4000", "tcp::2222"])
+    uart_args = uart_parser.parse_args(voltsarg + pinargs(uart_pins) + [ "-b", "115200", "tty"])
+    spifr_args = spifr_parser.parse_args(voltsarg + pinargs(spi_pins) + [ "--freq", "4000", "tcp::2222"])
 
     uart = UARTApplet()
     spifr = SPIFlashromApplet()
@@ -91,7 +92,6 @@ def main():
     root_logger = logging.getLogger()
     term_handler = logging.StreamHandler()
     root_logger.addHandler(term_handler)
-
     exit(asyncio.new_event_loop().run_until_complete(_main()))
 
 
